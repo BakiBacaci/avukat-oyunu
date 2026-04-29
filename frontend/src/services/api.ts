@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 60000, // Render free tier cold start için 60 sn bekle
 });
 
 // JWT token'ı her isteğe otomatik ekle
