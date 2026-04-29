@@ -1,0 +1,75 @@
+import { useEffect, useRef, useCallback } from 'react';
+import { useGameStore } from '../store/gameStore';
+import { useAuthStore } from '../store/authStore';
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+
+export function useWebSocket(matchId: string | null) {
+  const ws = useRef<WebSocket | null>(null);
+  const { user } = useAuthStore();
+  const {
+    addMessage, setJudgeHp, setCurrentTurn,
+    setMatchStatus, setLastVerdict, setCase,
+  } = useGameStore();
+
+  useEffect(() => {
+    if (!matchId || !user) return;
+
+    const socket = new WebSocket(`${WS_URL}/ws/${matchId}/${user.id}`);
+    ws.current = socket;
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      addMessage(data);
+
+      switch (data.type) {
+        case 'state_sync':
+          setJudgeHp(data.judge_hp);
+          setCurrentTurn(data.current_turn);
+          setMatchStatus(data.status);
+          if (data.case) setCase(data.case);
+          break;
+        case 'ai_verdict':
+          setJudgeHp(data.judge_hp);
+          setLastVerdict(data);
+          if (data.match_finished) setMatchStatus('finished');
+          break;
+        case 'turn_change':
+          setCurrentTurn(data.current_turn);
+          break;
+        case 'game_over':
+          setMatchStatus('finished');
+          break;
+      }
+    };
+
+    socket.onerror = () => console.error('[WS] Bağlantı hatası');
+    socket.onclose = () => console.log('[WS] Bağlantı kapandı');
+
+    return () => socket.close();
+  }, [matchId, user]);
+
+  const send = useCallback((message: object) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify(message));
+    }
+  }, []);
+
+  const sendArgument = useCallback((content: string) => {
+    send({ type: 'argument', content });
+  }, [send]);
+
+  const sendObjection = useCallback((reason?: string) => {
+    send({ type: 'objection', reason: reason || '' });
+  }, [send]);
+
+  const sendEvidence = useCallback((evidenceId: string, description: string) => {
+    send({ type: 'evidence', evidence_id: evidenceId, description });
+  }, [send]);
+
+  const sendChat = useCallback((content: string) => {
+    send({ type: 'chat', content });
+  }, [send]);
+
+  return { sendArgument, sendObjection, sendEvidence, sendChat };
+}
