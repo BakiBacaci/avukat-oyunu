@@ -116,7 +116,7 @@ class Match(Base):
     status = Column(String(20), default="waiting")
     winner_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     judge_hp = Column(Integer, default=100)          # Hakim Sabrı barı
-    current_turn = Column(String(20), default="prosecution")
+    current_turn = Column(String(20), default="prosecutor")
     lobby_code = Column(String(10), unique=True, nullable=True)
     ai_judge_active = Column(Boolean, default=True)
     started_at = Column(DateTime, nullable=True)
