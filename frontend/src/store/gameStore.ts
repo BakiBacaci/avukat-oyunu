@@ -42,7 +42,7 @@ export const useGameStore = create<GameState>((set) => ({
   lobbyCode: null,
   myRole: null,
   judgeHp: 100,
-  currentTurn: 'prosecution',
+  currentTurn: 'prosecutor',
   matchStatus: 'waiting',
   messages: [],
   caseInfo: null,
@@ -58,7 +58,7 @@ export const useGameStore = create<GameState>((set) => ({
   resetGame: () =>
     set({
       matchId: null, lobbyCode: null, myRole: null,
-      judgeHp: 100, currentTurn: 'prosecution', matchStatus: 'waiting',
+      judgeHp: 100, currentTurn: 'prosecutor', matchStatus: 'waiting',
       messages: [], caseInfo: null, lastVerdict: null,
     }),
 }));

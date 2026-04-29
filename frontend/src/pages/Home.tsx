@@ -43,14 +43,9 @@ export default function Home() {
     setLoading(mode); setError('');
     try {
       if (mode === 'bot') {
-        // Bot modu: maç oluştur, direkt oyuna gir (arkadaş beklemeden)
-        const { data } = await api.post('/api/matches/', { mode: '1v1', ai_judge_active: true });
+        // Bot modu: maç oluştur (backend otomatik botu ekleyecek), direkt oyuna gir
+        const { data } = await api.post('/api/matches/', { mode: 'bot', ai_judge_active: true });
         setMatch(data.id, data.lobby_code, 'prosecutor');
-        // Bot olarak defense ekle
-        await api.post('/api/matches/join', {
-          lobby_code: data.lobby_code,
-          role: 'defense',
-        }).catch(() => {}); // Bot zaten AI, hata olsa da devam
         // Maçı başlat
         await api.post(`/api/matches/${data.id}/start`).catch(() => {});
         navigate(`/game/${data.id}`);

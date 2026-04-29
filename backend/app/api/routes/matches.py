@@ -24,6 +24,14 @@ async def create_match(
         ai_judge_active=payload.ai_judge_active,
     )
     await crud.matches.add_participant(db, match.id, current_user.id, "prosecutor")
+
+    if payload.mode == "bot":
+        # Bot kullanıcısını bul veya oluştur
+        bot_user = await crud.users.get_user_by_username(db, "AI_Avukat")
+        if not bot_user:
+            bot_user = await crud.users.create_user(db, "AI_Avukat", "bot@avukat.local", "", skip_hash=True)
+        await crud.matches.add_participant(db, match.id, bot_user.id, "defense")
+
     return MatchOut.model_validate(match)
 
 

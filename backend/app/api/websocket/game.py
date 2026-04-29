@@ -89,10 +89,28 @@ async def game_websocket_handler(
                     "turn": match.current_turn,
                 })
 
-                # Her iki taraftan argüman geldiyse AI Hakim değerlendir
+                # Her iki taraftan argüman geldiyse veya BOT modundaysak ve savcı yazdıysa değerlendir
                 logs = match.logs
                 prosecution_args = [l.content for l in logs if l.action_type == "argument" and _get_role(match, l.user_id) == "prosecutor"]
                 defense_args = [l.content for l in logs if l.action_type == "argument" and _get_role(match, l.user_id) == "defense"]
+
+                # Eğer bot modundaysak ve kullanıcı (savcı) yazdıysa, sahte bir savunma argümanı ekle
+                if match.mode == "bot" and len(prosecution_args) > len(defense_args):
+                    bot_id = _get_player_by_role(match, "defense")
+                    bot_arg = "Müvekkilim masumdur. Savcılığın sunduğu deliller yetersiz ve yoruma açıktır."
+                    
+                    # Basit bir bot argümanı oluştur (gelişmiş yapay zeka buraya eklenebilir)
+                    await crud.matches.add_log(
+                        db, match_id=match_id, action_type="argument",
+                        content=bot_arg, user_id=bot_id
+                    )
+                    await manager.broadcast(match_id, {
+                        "type": "argument",
+                        "user_id": bot_id,
+                        "content": bot_arg,
+                        "turn": "defense",
+                    })
+                    defense_args.append(bot_arg)
 
                 if prosecution_args and defense_args and match.ai_judge_active:
                     verdict = await evaluate_arguments(
@@ -138,16 +156,17 @@ async def game_websocket_handler(
                             "winner_id": winner_id,
                         })
 
-                # Sırayı değiştir
-                new_turn = "defense" if match.current_turn == "prosecution" else "prosecution"
-                match_obj = await db.get(__import__('app.db.models', fromlist=['Match']).Match, match_id)
-                if match_obj:
-                    match_obj.current_turn = new_turn
-                    await db.flush()
-                await manager.broadcast(match_id, {
-                    "type": "turn_change",
-                    "current_turn": new_turn,
-                })
+                # Normal 1v1 modunda sırayı değiştir
+                if match.mode != "bot":
+                    new_turn = "defense" if match.current_turn == "prosecutor" else "prosecutor"
+                    match_obj = await db.get(__import__('app.db.models', fromlist=['Match']).Match, match_id)
+                    if match_obj:
+                        match_obj.current_turn = new_turn
+                        await db.flush()
+                    await manager.broadcast(match_id, {
+                        "type": "turn_change",
+                        "current_turn": new_turn,
+                    })
 
             # ── İTİRAZ ───────────────────────────────────────
             elif msg_type == "objection":

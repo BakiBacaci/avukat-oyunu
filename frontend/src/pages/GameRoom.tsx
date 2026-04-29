@@ -22,7 +22,7 @@ export default function GameRoom() {
   const gameOver = matchStatus === 'finished';
 
   const roleName: Record<string, string> = {
-    prosecution: '⚖️ Savcı', defense: '🛡️ Avukat',
+    prosecutor: '⚖️ Savcı', defense: '🛡️ Avukat',
     witness: '👁️ Tanık', judge: '🔨 Hakim',
   };
 
@@ -119,8 +119,8 @@ export default function GameRoom() {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               <div>Durum: <span style={{ color: 'var(--text-primary)' }}>{matchStatus}</span></div>
-              <div>Sıra: <span style={{ color: currentTurn === 'prosecution' ? '#e74c3c' : '#3498db' }}>
-                {currentTurn === 'prosecution' ? 'Savcı' : 'Avukat'}
+              <div>Sıra: <span style={{ color: currentTurn === 'prosecutor' ? '#e74c3c' : '#3498db' }}>
+                {currentTurn === 'prosecutor' ? 'Savcı' : 'Avukat'}
               </span></div>
               <div>Sen: <span style={{ color: 'var(--gold)' }}>{user?.username}</span></div>
             </div>
