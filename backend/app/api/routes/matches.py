@@ -1,10 +1,11 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db
 from app.db import crud
 from app.core.auth import get_current_user
 from app.schemas.match import MatchCreate, JoinMatch, MatchOut
+from app.api.websocket.manager import manager
+from datetime import datetime
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 
@@ -15,8 +16,6 @@ async def create_match(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Yeni maç oluştur ve savcı olarak katıl."""
-    # Rastgele bir dava çek
     case = await crud.cases.get_random_case(db)
     match = await crud.matches.create_match(
         db,
@@ -24,7 +23,6 @@ async def create_match(
         case_id=case.id if case else None,
         ai_judge_active=payload.ai_judge_active,
     )
-    # Oluşturan oyuncuyu savcı olarak ekle
     await crud.matches.add_participant(db, match.id, current_user.id, "prosecutor")
     return MatchOut.model_validate(match)
 
@@ -35,19 +33,25 @@ async def join_match(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Lobi kodu ile maça katıl."""
     match = await crud.matches.get_match_by_lobby_code(db, payload.lobby_code.upper())
     if not match:
         raise HTTPException(status_code=404, detail="Lobi bulunamadı.")
     if match.status == "finished":
         raise HTTPException(status_code=400, detail="Bu maç zaten bitti.")
 
-    # Aynı kişi iki kez katılmasın
     existing = [p for p in match.participants if p.user_id == current_user.id]
     if existing:
-        raise HTTPException(status_code=400, detail="Zaten bu maçtasın.")
+        return MatchOut.model_validate(match)
 
     await crud.matches.add_participant(db, match.id, current_user.id, payload.role)
+
+    # Lobideki herkese yeni oyuncu bildir
+    await manager.broadcast(match.id, {
+        "type": "player_joined",
+        "user_id": current_user.id,
+        "username": current_user.username,
+    })
+
     return MatchOut.model_validate(match)
 
 
@@ -57,18 +61,50 @@ async def start_match(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Maçı başlat (host tetikler)."""
+    from app.db.models import Match
     match = await crud.matches.get_match_by_id(db, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Maç bulunamadı.")
     if match.status != "waiting":
         raise HTTPException(status_code=400, detail="Maç zaten başladı veya bitti.")
 
-    match_obj = await db.get(__import__('app.db.models', fromlist=['Match']).Match, match_id)
+    match_obj = await db.get(Match, match_id)
     match_obj.status = "active"
     match_obj.started_at = datetime.utcnow()
     await db.flush()
+
+    # TÜM oyunculara oyunun başladığını bildir → redirect
+    await manager.broadcast(match_id, {
+        "type": "game_started",
+        "match_id": match_id,
+        "case": {
+            "title": match.case.title if match.case else "Bilinmeyen Dava",
+            "description": match.case.description if match.case else "",
+        },
+    })
+
     return MatchOut.model_validate(match_obj)
+
+
+@router.get("/lobby/{code}")
+async def get_lobby_info(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Lobi bilgilerini döndürür — polling için."""
+    match = await crud.matches.get_match_by_lobby_code(db, code.upper())
+    if not match:
+        raise HTTPException(status_code=404, detail="Lobi bulunamadı.")
+    return {
+        "match_id": match.id,
+        "status": match.status,
+        "lobby_code": match.lobby_code,
+        "participants": [
+            {"user_id": p.user_id, "username": p.user.username, "role": p.role}
+            for p in match.participants
+        ],
+    }
 
 
 @router.get("/{match_id}", response_model=MatchOut)

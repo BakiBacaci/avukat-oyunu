@@ -28,6 +28,10 @@ export function useWebSocket(matchId: string | null) {
           setMatchStatus(data.status);
           if (data.case) setCase(data.case);
           break;
+        case 'game_started':
+          setMatchStatus('active');
+          if (data.case) setCase(data.case);
+          break;
         case 'ai_verdict':
           setJudgeHp(data.judge_hp);
           setLastVerdict(data);
