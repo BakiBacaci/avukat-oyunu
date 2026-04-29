@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useAuthStore } from '../store/authStore';
-
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+import { WS_URL } from '../services/api';
 
 export function useWebSocket(matchId: string | null) {
   const ws = useRef<WebSocket | null>(null);
