@@ -89,17 +89,26 @@ async def game_websocket_handler(
                     "turn": match.current_turn,
                 })
 
-                # Her iki taraftan argüman geldiyse veya BOT modundaysak ve savcı yazdıysa değerlendir
+            # ── SIRAYI BİTİR (END TURN) ───────────────────────
+            elif msg_type == "end_turn":
+                match = await crud.matches.get_match_by_id(db, match_id)
+                if not match or match.status != "active":
+                    continue
+
+                user_role = _get_role(match, user_id)
+                if user_role != match.current_turn:
+                    continue  # Kendi sırası değilse bitiremez
+
                 logs = match.logs
                 prosecution_args = [l.content for l in logs if l.action_type == "argument" and _get_role(match, l.user_id) == "prosecutor"]
                 defense_args = [l.content for l in logs if l.action_type == "argument" and _get_role(match, l.user_id) == "defense"]
 
-                # Eğer bot modundaysak ve kullanıcı (savcı) yazdıysa, sahte bir savunma argümanı ekle
-                if match.mode == "bot" and len(prosecution_args) > len(defense_args):
+                # Eğer savcı sırasını bitirdiyse ve bot moduysa, bota otomatik cevap verdir ve hemen değerlendir
+                if match.mode == "bot" and match.current_turn == "prosecutor":
                     bot_id = _get_player_by_role(match, "defense")
                     bot_arg = "Müvekkilim masumdur. Savcılığın sunduğu deliller yetersiz ve yoruma açıktır."
                     
-                    # Basit bir bot argümanı oluştur (gelişmiş yapay zeka buraya eklenebilir)
+                    # Basit bir bot argümanı oluştur
                     await crud.matches.add_log(
                         db, match_id=match_id, action_type="argument",
                         content=bot_arg, user_id=bot_id
@@ -111,8 +120,24 @@ async def game_websocket_handler(
                         "turn": "defense",
                     })
                     defense_args.append(bot_arg)
+                    
+                    # Bot oynadıktan sonra sıra yapay zeka hakime geçer
+                    trigger_ai_eval = True
+                    new_turn = "prosecutor" # Değerlendirme sonrası sıra savcıya döner
+                
+                elif match.current_turn == "prosecutor":
+                    # Bot modu değilse, savcı bitirince sıra avukata geçer (henüz AI değerlendirmez)
+                    trigger_ai_eval = False
+                    new_turn = "defense"
 
-                if prosecution_args and defense_args and match.ai_judge_active:
+                elif match.current_turn == "defense":
+                    # Avukat da bitirince AI değerlendirir
+                    trigger_ai_eval = True
+                    new_turn = "prosecutor"
+
+                # AI Değerlendirmesi
+                if trigger_ai_eval and prosecution_args and defense_args and match.ai_judge_active:
+                    await manager.broadcast(match_id, {"type": "ai_evaluating"})
                     verdict = await evaluate_arguments(
                         case_description=match.case.description if match.case else "Bilinmeyen dava.",
                         prosecution_arg=prosecution_args[-1],
@@ -145,8 +170,7 @@ async def game_websocket_handler(
                     })
 
                     if updated_match.status == "finished":
-                        # Kazananı belirle
-                        winner_role = "defense" if verdict["advantage"] == "defense" else "prosecution"
+                        winner_role = "defense" if verdict["advantage"] == "defense" else "prosecutor"
                         winner_id = _get_player_by_role(match, winner_role)
                         if winner_id:
                             await crud.matches.finish_match(db, match_id, winner_id)
@@ -155,14 +179,13 @@ async def game_websocket_handler(
                             "winner_role": winner_role,
                             "winner_id": winner_id,
                         })
+                        return # Oyun bitti
 
-                # Normal 1v1 modunda sırayı değiştir
-                if match.mode != "bot":
-                    new_turn = "defense" if match.current_turn == "prosecutor" else "prosecutor"
-                    match_obj = await db.get(__import__('app.db.models', fromlist=['Match']).Match, match_id)
-                    if match_obj:
-                        match_obj.current_turn = new_turn
-                        await db.flush()
+                # Son olarak sırayı değiştir (eğer oyun bitmediyse)
+                match_obj = await db.get(__import__('app.db.models', fromlist=['Match']).Match, match_id)
+                if match_obj and match_obj.status != "finished":
+                    match_obj.current_turn = new_turn
+                    await db.flush()
                     await manager.broadcast(match_id, {
                         "type": "turn_change",
                         "current_turn": new_turn,

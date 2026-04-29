@@ -43,6 +43,9 @@ export function useWebSocket(matchId: string | null) {
         case 'game_over':
           setMatchStatus('finished');
           break;
+        case 'ai_evaluating':
+          // Optionally add a state for 'AI is evaluating' if we want a UI spinner
+          break;
       }
     };
 
@@ -74,5 +77,9 @@ export function useWebSocket(matchId: string | null) {
     send({ type: 'chat', content });
   }, [send]);
 
-  return { sendArgument, sendObjection, sendEvidence, sendChat };
+  const sendEndTurn = useCallback(() => {
+    send({ type: 'end_turn' });
+  }, [send]);
+
+  return { sendArgument, sendObjection, sendEvidence, sendChat, sendEndTurn };
 }

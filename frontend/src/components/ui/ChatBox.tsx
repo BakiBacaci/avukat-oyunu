@@ -10,7 +10,7 @@ interface Props {
 }
 
 const roleLabel: Record<string, string> = {
-  prosecution: 'SAVCI',
+  prosecutor: 'SAVCI',
   defense: 'AVUKAT',
   witness: 'TANIK',
   system: 'SİSTEM',
@@ -48,7 +48,7 @@ export default function ChatBox({ messages, myRole, onSendArgument, isMyTurn }: 
           const msgRole = msg.type === 'ai_verdict' ? 'ai_verdict'
             : msg.type === 'objection' ? 'objection'
             : msg.type === 'system' ? 'system'
-            : (msg.user_id === myRole ? myRole : 'prosecution'); // simplified
+            : (msg.user_id === myRole ? myRole : 'prosecutor'); // simplified
 
           return (
             <div key={i} className={`chat-msg ${msgRole === 'ai_verdict' ? 'system' : msgRole}`}>

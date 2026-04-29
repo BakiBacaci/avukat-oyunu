@@ -16,10 +16,11 @@ export default function GameRoom() {
   } = useGameStore();
 
   const activeMatchId = matchId || paramId || null;
-  const { sendArgument, sendObjection } = useWebSocket(activeMatchId);
+  const { sendArgument, sendObjection, sendEndTurn } = useWebSocket(activeMatchId);
 
   const isMyTurn = myRole === currentTurn;
   const gameOver = matchStatus === 'finished';
+  const isWaiting = matchStatus === 'waiting';
 
   const roleName: Record<string, string> = {
     prosecutor: '⚖️ Savcı', defense: '🛡️ Avukat',
@@ -63,11 +64,35 @@ export default function GameRoom() {
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 340px', gap: 0 }}>
-        {/* Main chat area */}
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRight: '1px solid var(--border)' }}>
-          {/* Case description */}
-          {caseInfo && (
+      {/* Waiting Screen */}
+      {isWaiting && (
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', padding: '2rem'
+        }}>
+          <div className="spinner" style={{ marginBottom: '1.5rem', width: 40, height: 40, borderWidth: 3 }} />
+          <h2 style={{ fontFamily: 'Cinzel', color: 'var(--gold)', marginBottom: '0.5rem' }}>Oyun Kuruluyor</h2>
+          <p style={{ color: 'var(--text-secondary)' }}>Host'un oyunu başlatması bekleniyor...</p>
+        </div>
+      )}
+
+      {!isWaiting && (
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 340px', gap: 0 }}>
+          {/* Main chat area */}
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderRight: '1px solid var(--border)' }}>
+            
+            {/* Tutorial Banner */}
+            <div style={{ background: 'var(--bg-raised)', border: '1px solid var(--border)', padding: '1rem', borderRadius: 'var(--radius)', textAlign: 'center', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--gold)', fontWeight: 600 }}>📖 NASIL OYNANIR?</span><br/>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {myRole === 'prosecutor' 
+                  ? "Sen Savcısın. Şüpheliyi suçlayacak mantıklı argümanlar sun (birden fazla mesaj atabilirsin). İşin bitince aşağıdaki 'Sıramı Bitir' butonuna bas!"
+                  : "Sen Avukatsın. Savcının iddialarını okuyup çürüt (birden fazla mesaj atabilirsin). İşin bitince aşağıdaki 'Sıramı Bitir' butonuna bas!"}
+              </span>
+            </div>
+
+            {/* Case description */}
+            {caseInfo && (
             <div className="card" style={{ padding: '1rem' }}>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginBottom: '0.5rem', fontFamily: 'Cinzel', letterSpacing: '0.05em' }}>DAVA DOSYASI</p>
               <p style={{ fontSize: '0.9rem', lineHeight: 1.7, color: 'var(--text-primary)' }}>{caseInfo.description}</p>
@@ -101,10 +126,20 @@ export default function GameRoom() {
             isMyTurn={isMyTurn && !gameOver}
           />
 
-          {/* Objection */}
+          {/* Action Area (End Turn / Objection) */}
           {!gameOver && (
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <ObjectionButton onObjection={sendObjection} />
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+              {isMyTurn ? (
+                <button 
+                  className="btn btn-gold" 
+                  onClick={sendEndTurn}
+                  style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', letterSpacing: '0.05em' }}
+                >
+                  🛑 SIRAMI BİTİR
+                </button>
+              ) : (
+                <ObjectionButton onObjection={sendObjection} />
+              )}
             </div>
           )}
         </div>
@@ -133,12 +168,13 @@ export default function GameRoom() {
             <ul style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 2, paddingLeft: '1rem' }}>
               <li>Somut delile atıfta bulun</li>
               <li>Mantıksal tutarlılık önemli</li>
-              <li>Rakibi çürüt, savun</li>
+              <li>Sıran bitince "Sıramı Bitir"e bas</li>
               <li>İtiraz hakkın var!</li>
             </ul>
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
