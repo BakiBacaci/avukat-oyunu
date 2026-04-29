@@ -28,10 +28,9 @@ async def guest_login(payload: GuestLogin, db: AsyncSession = Depends(get_db)):
     user = await crud.users.get_user_by_username(db, username)
     if not user:
         suffix = ''.join(random.choices(string.digits, k=4))
-        # Bcrypt max 72 byte — kısa ve güvenli tut
-        safe_password = f"gst{suffix}"  # max 7 karakter, sorun yok
         fake_email = f"{username.lower().replace(' ', '_')}_{suffix}@avukat-oyunu.local"
-        user = await crud.users.create_user(db, username, fake_email, safe_password)
+        # skip_hash=True: bcrypt'i tamamen bypass et, guest şifresiz oynar
+        user = await crud.users.create_user(db, username, fake_email, "", skip_hash=True)
 
     token = create_access_token({"sub": user.id})
     return Token(access_token=token, user=UserOut.model_validate(user))
